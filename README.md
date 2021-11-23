@@ -1,5 +1,5 @@
 # Swift To Unity iOS Example
-This example project demonstrates how to setup your Xcode project so that your Swift code is able to call Unity's Objective-C methods (e.g. `UnitySendMessage`), particularly in Unity 2019.3 and later.
+This example project demonstrates how to setup your SharePlay Xcode project so that your Swift code is able to call Unity's Objective-C methods for GroupActivities (e.g. `UnitySendMessage`), particularly in Unity 2019.3 and later. Original SwiftToUnity by jwtan, SharePlay update by Brian Handy.
 
 ## Unity 2019.2 and earlier
 If you're running Unity 2019.2 and earlier, the solution is simple. You just need a [Bridging Header](https://developer.apple.com/documentation/swift/imported_c_and_objective-c_apis/importing_objective-c_into_swift) that imports `UnityInterface.h`. This will allow your Swift code to call `UnitySendMessage` without any further modifications.
@@ -106,3 +106,6 @@ Example Objective-C script that is called by `CubeScript.cs` during `Start()` wh
 
 ### SwiftToUnity.swift
 Example Swift script that calls `UnitySendMessage`.
+
+## SharePlay Notes
+Code should "just work" on iOS devices. Update to iOS 15.0 is required for all SharePlay, so that applies here too. We don't have error messages in yet for iOS 14.0 and below, but they don't crash either. Entitlements file is hooked in and copied over so that GroupSession (GroupActivity) Capability is requested automatically on build time (ie. Unity Cloud Build friendly).
