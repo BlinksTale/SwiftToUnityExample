@@ -108,4 +108,4 @@ Example Objective-C script that is called by `CubeScript.cs` during `Start()` wh
 Example Swift script that calls `UnitySendMessage`.
 
 ## SharePlay Notes
-Code should "just work" on iOS devices. Update to iOS 15.0 is required for all SharePlay, so that applies here too. We don't have error messages in yet for iOS 14.0 and below, but they don't crash either. Entitlements file is hooked in and copied over so that GroupSession (GroupActivity) Capability is requested automatically on build time (ie. Unity Cloud Build friendly).
+Code should "just work" on iOS devices. Update to iOS 15.0 is required for all SharePlay, so that applies here too. We don't have error messages in yet for iOS 14.0 and below, but they don't crash either. Entitlements file is hooked in and copied over so that GroupSession (GroupActivity) Capability is requested automatically on build time (ie. Unity Cloud Build friendly). SharePlay code is a bit messy, but has all basics working.
