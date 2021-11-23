@@ -3,7 +3,9 @@ guid: 189b6879dfcb04d01ba9aa0f01a1c2e4
 MonoImporter:
   externalObjects: {}
   serializedVersion: 2
-  defaultReferences: []
+  defaultReferences:
+  - m_entitlementsFile: {fileID: 102900000, guid: 864f53f3a410840838dcec4eeaba3078,
+      type: 3}
   executionOrder: 0
   icon: {instanceID: 0}
   userData: 
