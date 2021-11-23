@@ -1,4 +1,4 @@
-# Swift To Unity iOS Example
+# Swift To Unity SharePlay iOS Example
 This example project demonstrates how to setup your SharePlay Xcode project so that your Swift code is able to call Unity's Objective-C methods for GroupActivities (e.g. `UnitySendMessage`), particularly in Unity 2019.3 and later. Original SwiftToUnity by jwtan, SharePlay update by Brian Handy.
 
 ## Unity 2019.2 and earlier
