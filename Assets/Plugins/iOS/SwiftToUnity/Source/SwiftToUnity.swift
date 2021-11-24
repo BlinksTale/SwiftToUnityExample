@@ -33,9 +33,10 @@ import CloudKit
 
 // Message types that we can send via GroupActivity
 enum GroupTextMessageType: Codable {
-  case join(id: UUID?, name: String)
+  case joinGame(id: UUID?, name: String)
+  case requestLatest(leaveThisEmpty: String) // FIXME: "leaveThisEmpty" should be deleted, but was causing some trouble earlier so we're leaving it in for now
   case sendText(text: String)
-  case leave(id: UUID?, name: String)
+  case leaveGame(id: UUID?, name: String)
 }
 
 // Actual activity in action - mostly holds metadata
@@ -88,6 +89,10 @@ extension Bundle {
     return activity
   }()
   
+  // Are we creating groupSession ourselves, or joining someone else's?
+  var creatingSession = false // act of creating, we claim ownership over next session successfully created unless we cancel
+  var createdSessionId:UUID?; // the session we created
+  
   @objc public var localPlayerNumber = Int.random(in: 0..<1024)
   @objc public var localPlayerName: String {
     get {
@@ -108,6 +113,12 @@ extension Bundle {
     groupSessionMessenger = messenger
     groupSession = localGroupSession
     
+    // Are we the authors of this groupSession, or are we joining someone else's?
+    if (creatingSession) {
+      createdSessionId = localGroupSession.id
+      creatingSession = false
+    }
+
     addToPlayersList(id: groupSession?.localParticipant.id, name: localPlayerName)
     
     // clear past listeners listening for self's join calls (self joining others):
@@ -116,13 +127,31 @@ extension Bundle {
     setupMessageSending(messenger: messenger)
     setupMessageReceiving(messenger: messenger)
     
+    // variables to help us determine if we're the new users joining vs existing group
+    // (might be redundant - check these again later to see if we can delete them)
+    let oldPlayerCount = groupSession?.activeParticipants.count ?? 0
+    let oldSessionStarted = groupSession?.state == GroupSession.State.joined
+    
     groupSession?.join()
+    
+    // track if this is our session or another group's that we are joining
+    let didCreateSession = createdSessionId == localGroupSession.id
+        
+    // Are we the newbies / new ones joining?
+    if (oldPlayerCount <= 1 && !oldSessionStarted && !didCreateSession ) {
+      
+      print("We are the new player joining! Request the last message sent to everyone so we're up to date.") // only if we're new, and we didn't make this session
+      
+      // We are in fact new! Ask for latest message to be sent out again
+      messengerSend(messenger: messenger, GroupTextMessageType.requestLatest(leaveThisEmpty: "")) // ask others to give you the screen they are all on
+    }
     
   }
   
   // Run Configure for our groupSession
   @objc public func setupGroupActivity() {
-    let task = Task.detached { [self] in
+    let task = Task.detached { [weak self] in
+      guard let self = self else { return }
       //guard let self = self else { return } // disabled since we aren't in a class implementation, though another null check might help here instead (EDIT: this was an old comment/decision, but haven't figured out fix now that we are in a class yet since re-enabling doesn't "just work" either)
       
       for await session in GroupMessageActivity.sessions() {
@@ -136,6 +165,7 @@ extension Bundle {
   
   // Start of activity:
   @objc public func startGroupActivity() {
+    creatingSession = true
     Task.init {
       setupGroupActivity()
       
@@ -154,7 +184,7 @@ extension Bundle {
   
   // Conclusion of activity:
   @objc public func endGroupActivity() {
-    
+    creatingSession = false
     resetPlayersList()
     
     // Then terminate session: (try .leave later maybe, to not kick out others or if not last?)
@@ -173,7 +203,7 @@ extension Bundle {
   @objc public func handleEndGroupActivity() {
     lastGroupText = "Ended Group Activity"
     
-    groupMessengerSend(GroupTextMessageType.leave(id: groupSession?.localParticipant.id, name: localPlayerName))
+    groupMessengerSend(GroupTextMessageType.leaveGame(id: groupSession?.localParticipant.id, name: localPlayerName))
     endGroupActivity()
   }
   
@@ -207,7 +237,7 @@ extension Bundle {
   @objc public func getPlayersListString() -> String {
     var result = ""
     currentPlayersList.forEach {
-      result = "\(result)\n\($0)"
+      result = "\(result), \($0.value)"
     }
     UnitySendMessage("Cube", "OnMessageReceived", "GetPlayersListString: \(result)");
     return result
@@ -216,9 +246,10 @@ extension Bundle {
   // Send data to all participants using GroupSessionMessenger
   public func setupMessageSending(messenger: GroupSessionMessenger) {
     
-    groupSession?.$activeParticipants.sink{ [self] activeParticipants in
+    groupSession?.$activeParticipants.sink{ [weak self] activeParticipants in
+      guard let self = self else { return }
       
-      messengerSend(messenger: messenger, GroupTextMessageType.join(id: groupSession?.localParticipant.id, name: localPlayerName))
+      self.messengerSend(messenger: messenger, GroupTextMessageType.joinGame(id: self.groupSession?.localParticipant.id, name: self.localPlayerName))
       
     }.store(in: &subscriptions)
     
@@ -231,11 +262,13 @@ extension Bundle {
       // task to receive message via group session messenger
       for await (message, _) in messenger.messages(of: GroupTextMessageType.self) {
         switch message {
-        case .join(let id, let name):
+        case .joinGame(let id, let name):
           await self.handleJoinMessage(id: id, name: name)
+        case .requestLatest(let empty):
+          await self.handleRequestLatest()
         case .sendText(let text):
           await self.handleTextMessage(text: text)
-        case .leave(let id, let name):
+        case .leaveGame(let id, let name):
           await self.handleLeaveMessage(id: id, name: name)
         }
       }
@@ -287,8 +320,7 @@ extension Bundle {
   
   // Player Joins Game:
   @objc public func handleJoinMessage(id:UUID?, name: String) {
-    lastGroupText = "Hello, " + name + "!"
-    
+    print("Handle new player joining, named: \(name)")
     addToPlayersList(id: id, name: name)
   }
 
@@ -297,10 +329,16 @@ extension Bundle {
     setText(text: text)
   }
 
+  // Request for latest Text Received:
+  // (are we the oldies / existing group?)
+  @objc public func handleRequestLatest() {
+      print("Handle latest message requested (ie. a new player has joined, send them what everyone else got most recently for a message)")
+    sendTextMessage(text: lastGroupText) // send latest to everyone again, so all are up to date
+  }
+  
   // Player Leaves Game:
   @objc public func handleLeaveMessage(id:UUID?, name: String) {
     lastGroupText = "Goodbye, " + name + "!"
-    
     removeFromPlayersList(id: id)
   }
   
